@@ -1,5 +1,5 @@
 /* ============================================================
-   亲戚来了 · 暖夜玻璃风设计系统（原生体验增强版 v1.1）
+   经期记 · 暖夜玻璃风设计系统（原生体验增强版 v1.1）
    深色暖棕底 · 玻璃拟物 · 郁金香红强调 · 微交互 · 类原生动效
    ============================================================ */
 
@@ -446,20 +446,21 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 
 .about { text-align: center; color: var(--text-soft); font-size: 12px; line-height: 1.9; margin: 30px 0 6px; letter-spacing: 0.4px; }
 
-/* ---------- 底部导航（悬浮玻璃条） ---------- */
+/* ---------- 底部导航（原生式全宽底栏，贴底显示） ---------- */
 .tabbar {
   position: absolute;
-  left: 12px; right: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 0; right: 0;
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
   z-index: 20;
   display: flex;
-  background: rgba(20, 14, 12, 0.72);
+  background: rgba(20, 14, 12, 0.82);
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   backdrop-filter: blur(22px) saturate(1.4);
-  border: 1px solid rgba(242, 230, 214, 0.12);
-  border-radius: 22px;
-  padding: 9px 0;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+  border: none;
+  border-top: 1px solid rgba(242, 230, 214, 0.12);
+  border-radius: 0;
+  padding: 9px 0 calc(9px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .tab {
   flex: 1; border: none; background: none; cursor: pointer;

@@ -1,6 +1,6 @@
 {
-  "name": "亲戚来了 · 经期记录",
-  "short_name": "亲戚来了",
+  "name": "经期记 · 经期记录",
+  "short_name": "经期记",
   "description": "极简经期记录工具，数据仅存于本机",
   "lang": "zh-CN",
   "start_url": ".",
