@@ -1,6 +1,6 @@
 /* ============================================================
-   亲戚来了 · 应用逻辑
-   存储 / 预测 / 日历 / 记录 / 设置 / 导出
+   亲戚来了 · 应用逻辑（原生体验增强版 v1.1）
+   存储 / 预测 / 日历 / 记录（底部弹层）/ 设置 / 导出 / 下拉刷新 / 触觉反馈
    ============================================================ */
 (function () {
   "use strict";
@@ -15,10 +15,18 @@
     gold:   { accent: "#c9a85a", soft: "rgba(201,168,90,0.22)",  ink: "#ecdaa8" }, // 暮金
   };
 
+  const VIEW_ORDER = ["dashboard", "record", "settings"];
+
   /* ---------------- 状态 ---------------- */
   let state = load();
-  let viewYear, viewMonth; // 当前日历展示的年月
+  let viewYear, viewMonth;
+  let currentView = "dashboard";
   let editingId = null;
+
+  /* ---------------- 触觉反馈（安卓生效，iOS 静默忽略） ---------------- */
+  function haptic(ms) {
+    if (navigator.vibrate) { try { navigator.vibrate(ms || 8); } catch (e) {} }
+  }
 
   function load() {
     try {
@@ -48,7 +56,6 @@
   function diffDays(a, b) { return Math.round((b - a) / 86400000); }
   function today() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12); }
   function fmtMD(d) { return (d.getMonth() + 1) + "月" + d.getDate() + "日"; }
-  function fmtMDshort(d) { return (d.getMonth() + 1) + "/" + d.getDate(); }
 
   /* ---------------- 经期数据集合 ---------------- */
   function recordedSet() {
@@ -79,41 +86,31 @@
     return set;
   }
 
-  /* ---------------- 预测摘要 ---------------- */
+  /* ---------------- 预测摘要（用于看板副标题） ---------------- */
   function predictSummary() {
     const t = today();
     if (!state.records.length) {
-      return { label: "距离下次经期", value: "—", sub: "尚未记录经期，点击下方开始" };
+      return "尚未记录经期，点击下方开始";
     }
     const last = state.records[state.records.length - 1];
     const lastStart = parseYMD(last.start);
     const lastEnd = addDays(lastStart, last.duration - 1);
     const cycle = +state.settings.cycle;
 
-    // 当前是否处于经期中
     if (t >= lastStart && t <= lastEnd) {
       const dayNo = diffDays(lastStart, t) + 1;
-      return {
-        label: "经期进行中",
-        value: "第 " + dayNo + " 天",
-        sub: "预计 " + fmtMD(lastEnd) + " 结束",
-      };
+      return "经期进行中 · 第 " + dayNo + " 天";
     }
     const next = addDays(lastStart, cycle);
     const days = diffDays(t, next);
-    if (days > 0) {
-      return { label: "距离下次经期", value: "还有 " + days + " 天", sub: "预计 " + fmtMD(next) + " 来潮" };
-    }
-    return { label: "已超过预计", value: Math.abs(days) + " 天", sub: "预计 " + fmtMD(next) + " 来潮（已逾期）" };
+    if (days > 0) return "距离下次经期还有 " + days + " 天";
+    return "已超过预计 " + Math.abs(days) + " 天（已逾期）";
   }
 
   /* ---------------- 渲染：看板 ---------------- */
   function renderDashboard() {
-    const t = today();
-    // 问候（固定品牌文案）
     document.getElementById("greet-text").textContent = "肖战守护我";
-    document.getElementById("today-label").textContent = fmtMD(t) + " · 星期" + "日一二三四五六"[t.getDay()];
-
+    document.getElementById("today-label").textContent = predictSummary();
     renderCalendar();
   }
 
@@ -121,8 +118,7 @@
   function renderCalendar() {
     const t = today();
     const first = new Date(viewYear, viewMonth, 1, 12);
-    const title = viewYear + "年" + (viewMonth + 1) + "月";
-    document.getElementById("cal-title").textContent = title;
+    document.getElementById("cal-title").textContent = viewYear + "年" + (viewMonth + 1) + "月";
 
     const wk = +state.settings.weekStart;
     const heads = ["日", "一", "二", "三", "四", "五", "六"];
@@ -158,6 +154,7 @@
       num.textContent = d.getDate();
       cell.appendChild(num);
       cell.style.setProperty("--d", (i * 8) + "ms");
+      cell.addEventListener("click", () => openSheet(null, key));
       grid.appendChild(cell);
     }
   }
@@ -200,14 +197,35 @@
     });
   }
 
-  /* ---------------- 记录表单 ---------------- */
-  function resetForm() {
+  /* ---------------- 记录弹层（底部 sheet） ---------------- */
+  let sheet, backdrop;
+
+  function openSheet(editId, presetDate) {
+    editingId = editId || null;
+    const startEl = document.getElementById("in-start");
+    const durEl = document.getElementById("in-duration");
+    if (editingId) {
+      const r = state.records.find((x) => x.id === editingId);
+      if (!r) return;
+      document.getElementById("form-title").textContent = "编辑记录";
+      document.getElementById("form-submit").textContent = "更新记录";
+      startEl.value = r.start;
+      durEl.value = r.duration;
+    } else {
+      document.getElementById("form-title").textContent = "新增记录";
+      document.getElementById("form-submit").textContent = "保存记录";
+      startEl.value = presetDate || ymd(today());
+      durEl.value = state.settings.periodLen;
+    }
+    sheet.classList.add("open");
+    backdrop.classList.add("show");
+    haptic(10);
+  }
+
+  function closeSheet() {
+    sheet.classList.remove("open");
+    backdrop.classList.remove("show");
     editingId = null;
-    document.getElementById("form-title").textContent = "新增记录";
-    document.getElementById("form-submit").textContent = "保存记录";
-    document.getElementById("form-cancel").style.display = "none";
-    document.getElementById("in-start").value = ymd(today());
-    document.getElementById("in-duration").value = state.settings.periodLen;
   }
 
   function submitForm() {
@@ -227,30 +245,17 @@
     }
     state.records.sort((a, b) => a.start.localeCompare(b.start));
     save();
-    resetForm();
+    closeSheet();
     renderRecords();
-    switchView("dashboard");
     renderDashboard();
-  }
-
-  function editRecord(id) {
-    const r = state.records.find((x) => x.id === id);
-    if (!r) return;
-    editingId = id;
-    document.getElementById("form-title").textContent = "编辑记录";
-    document.getElementById("form-submit").textContent = "更新记录";
-    document.getElementById("form-cancel").style.display = "";
-    document.getElementById("in-start").value = r.start;
-    document.getElementById("in-duration").value = r.duration;
-    switchView("record");
-    window.scrollTo(0, 0);
+    haptic(12);
   }
 
   function deleteRecord(id) {
     if (!confirm("确定删除这条记录吗？")) return;
     state.records = state.records.filter((x) => x.id !== id);
     save();
-    if (editingId === id) resetForm();
+    if (editingId === id) editingId = null;
     renderRecords();
     renderDashboard();
     toast("已删除");
@@ -280,6 +285,7 @@
         renderSwatches();
         renderDashboard();
         toast("主题已更新");
+        haptic(8);
       });
       wrap.appendChild(s);
     });
@@ -333,14 +339,20 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  /* ---------------- 视图切换 ---------------- */
+  /* ---------------- 视图切换（方向感知） ---------------- */
   function switchView(name) {
-    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
-    document.getElementById("view-" + name).classList.add("active");
+    if (name === currentView) return;
+    const dir = VIEW_ORDER.indexOf(name) > VIEW_ORDER.indexOf(currentView) ? 1 : -1;
+    const incoming = document.getElementById("view-" + name);
+    incoming.style.setProperty("--enter", (dir * 26) + "px");
+    incoming.classList.add("active");
+    document.getElementById("view-" + currentView).classList.remove("active");
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+    currentView = name;
     if (name === "dashboard") renderDashboard();
     if (name === "record") renderRecords();
-    if (name === "settings") { syncSettingsInputs(); }
+    if (name === "settings") syncSettingsInputs();
+    haptic(6);
   }
 
   /* ---------------- Toast ---------------- */
@@ -353,43 +365,107 @@
     toastTimer = setTimeout(() => el.classList.remove("show"), 1800);
   }
 
+  /* ---------------- 下拉刷新（看板） ---------------- */
+  function setupPullToRefresh() {
+    const scroller = document.getElementById("dash-scroll");
+    const ptr = document.getElementById("ptr");
+    const ptrText = document.getElementById("ptr-text");
+    let startY = 0, pull = 0, active = false, busy = false;
+
+    scroller.addEventListener("touchstart", (e) => {
+      if (scroller.scrollTop <= 0 && !busy) { startY = e.touches[0].clientY; active = true; ptr.classList.remove("snap"); }
+    }, { passive: true });
+
+    scroller.addEventListener("touchmove", (e) => {
+      if (!active || busy) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 0 && scroller.scrollTop <= 0) {
+        e.preventDefault();
+        pull = Math.min(dy * 0.55, 72);
+        ptr.classList.add("dragging");
+        ptr.style.transform = "translateY(" + (-56 + pull) + "px)";
+        ptr.style.opacity = Math.min(1, pull / 40);
+        ptrText.textContent = pull > 52 ? "释放刷新" : "下拉刷新";
+      } else {
+        active = false;
+      }
+    }, { passive: false });
+
+    scroller.addEventListener("touchend", () => {
+      if (!active || busy) return;
+      active = false;
+      ptr.classList.remove("dragging");
+      ptr.classList.add("snap");
+      if (pull > 52) {
+        busy = true;
+        ptr.style.transform = "translateY(0)";
+        ptr.style.opacity = "1";
+        ptr.classList.add("spin");
+        ptrText.textContent = "刷新中…";
+        haptic(14);
+        setTimeout(() => {
+          renderCalendar();
+          renderDashboard();
+          ptrText.textContent = "已更新";
+          setTimeout(() => {
+            ptr.classList.remove("spin");
+            ptr.style.transform = "translateY(-56px)";
+            ptr.style.opacity = "0";
+            busy = false; pull = 0;
+            setTimeout(() => ptr.classList.remove("snap"), 320);
+          }, 420);
+        }, 620);
+      } else {
+        ptr.style.transform = "translateY(-56px)";
+        ptr.style.opacity = "0";
+        pull = 0;
+        setTimeout(() => ptr.classList.remove("snap"), 320);
+      }
+    });
+  }
+
   /* ---------------- 绑定事件 ---------------- */
   function bind() {
+    sheet = document.getElementById("sheet");
+    backdrop = document.getElementById("sheet-backdrop");
+
     // 导航
     document.querySelectorAll(".tab").forEach((t) =>
       t.addEventListener("click", () => switchView(t.dataset.view))
     );
-    document.getElementById("go-record").addEventListener("click", () => {
-      resetForm(); switchView("record");
-    });
+    document.getElementById("go-record").addEventListener("click", () => openSheet(null));
+    document.getElementById("add-record").addEventListener("click", () => openSheet(null));
 
     // 日历翻月
     const t = today();
     viewYear = t.getFullYear(); viewMonth = t.getMonth();
     document.getElementById("cal-prev").addEventListener("click", () => {
+      haptic(8);
       viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } renderCalendar();
     });
     document.getElementById("cal-next").addEventListener("click", () => {
+      haptic(8);
       viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } renderCalendar();
     });
 
-    // 表单
+    // 弹层表单
     document.getElementById("form-submit").addEventListener("click", submitForm);
-    document.getElementById("form-cancel").addEventListener("click", () => { resetForm(); });
+    document.getElementById("form-cancel").addEventListener("click", () => { closeSheet(); haptic(8); });
+    backdrop.addEventListener("click", () => closeSheet());
     const durInput = document.getElementById("in-duration");
     document.getElementById("dur-minus").addEventListener("click", () => {
-      let v = parseInt(durInput.value, 10) || 1; if (v > 1) durInput.value = v - 1;
+      let v = parseInt(durInput.value, 10) || 1; if (v > 1) durInput.value = v - 1; haptic(8);
     });
     document.getElementById("dur-plus").addEventListener("click", () => {
-      let v = parseInt(durInput.value, 10) || 1; if (v < 15) durInput.value = v + 1;
+      let v = parseInt(durInput.value, 10) || 1; if (v < 15) durInput.value = v + 1; haptic(8);
     });
 
     // 列表操作（事件委托）
     document.getElementById("record-list").addEventListener("click", (e) => {
       const ed = e.target.closest("[data-edit]");
       const dl = e.target.closest("[data-del]");
-      if (ed) editRecord(ed.dataset.edit);
-      if (dl) deleteRecord(dl.dataset.del);
+      if (ed) { openSheet(ed.dataset.edit); haptic(8); }
+      if (dl) { deleteRecord(dl.dataset.del); }
     });
 
     // 设置：周期 / 经期时长
@@ -400,27 +476,30 @@
       v = Math.max(min, Math.min(max, v + delta)); input.value = v;
       return v;
     }
-    document.getElementById("cyc-minus").addEventListener("click", () => { state.settings.cycle = bump(cyc, 20, 45, -1); save(); renderDashboard(); });
-    document.getElementById("cyc-plus").addEventListener("click", () => { state.settings.cycle = bump(cyc, 20, 45, 1); save(); renderDashboard(); });
-    document.getElementById("pl-minus").addEventListener("click", () => { state.settings.periodLen = bump(pl, 2, 12, -1); save(); renderDashboard(); });
-    document.getElementById("pl-plus").addEventListener("click", () => { state.settings.periodLen = bump(pl, 2, 12, 1); save(); renderDashboard(); });
+    document.getElementById("cyc-minus").addEventListener("click", () => { state.settings.cycle = bump(cyc, 20, 45, -1); save(); renderDashboard(); haptic(8); });
+    document.getElementById("cyc-plus").addEventListener("click", () => { state.settings.cycle = bump(cyc, 20, 45, 1); save(); renderDashboard(); haptic(8); });
+    document.getElementById("pl-minus").addEventListener("click", () => { state.settings.periodLen = bump(pl, 2, 12, -1); save(); renderDashboard(); haptic(8); });
+    document.getElementById("pl-plus").addEventListener("click", () => { state.settings.periodLen = bump(pl, 2, 12, 1); save(); renderDashboard(); haptic(8); });
     cyc.addEventListener("change", () => { let v = parseInt(cyc.value, 10); if (isNaN(v)) v = 28; v = Math.max(20, Math.min(45, v)); cyc.value = v; state.settings.cycle = v; save(); renderDashboard(); });
     pl.addEventListener("change", () => { let v = parseInt(pl.value, 10); if (isNaN(v)) v = 5; v = Math.max(2, Math.min(12, v)); pl.value = v; state.settings.periodLen = v; save(); renderDashboard(); });
 
     // 每周起始
     document.getElementById("week-seg").addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
-      state.settings.weekStart = +b.dataset.val; save(); syncSettingsInputs(); renderCalendar();
+      state.settings.weekStart = +b.dataset.val; save(); syncSettingsInputs(); renderCalendar(); haptic(8);
     });
 
     // 导出 / 清空
-    document.getElementById("btn-export").addEventListener("click", exportData);
+    document.getElementById("btn-export").addEventListener("click", () => { exportData(); haptic(8); });
     document.getElementById("btn-clear").addEventListener("click", () => {
       if (!confirm("将清空全部经期记录与设置，确定吗？")) return;
-      state = { records: [], settings: { cycle: 28, periodLen: 5, theme: state.settings.theme, weekStart: state.settings.weekStart } };
+      const theme = state.settings.theme, ws = state.settings.weekStart;
+      state = { records: [], settings: { cycle: 28, periodLen: 5, theme: theme, weekStart: ws } };
       save(); applyTheme(state.settings.theme); renderSwatches(); syncSettingsInputs();
       renderRecords(); renderDashboard(); toast("已清空");
     });
+
+    setupPullToRefresh();
   }
 
   /* ---------------- 初始化 ---------------- */
@@ -428,11 +507,29 @@
     applyTheme(state.settings.theme);
     renderSwatches();
     bind();
-    resetForm();
     switchView("dashboard");
+    renderDashboard();
+
+    // 启动闪屏淡出
+    const splash = document.getElementById("splash");
+    if (splash) {
+      requestAnimationFrame(() => setTimeout(() => {
+        splash.classList.add("hide");
+        setTimeout(() => splash.remove(), 500);
+      }, 140));
+    }
+
+    // 标记独立运行模式（主屏打开）
+    if (navigator.standalone || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)) {
+      document.body.classList.add("standalone");
+    }
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 
   /* 注册 Service Worker：支持主屏独立运行 + 离线 */
   if ("serviceWorker" in navigator) {
