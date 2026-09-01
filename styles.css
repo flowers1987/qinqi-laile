@@ -75,7 +75,7 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   flex-direction: column;
   overflow: hidden;
   padding-top: env(safe-area-inset-top, 0);
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-bottom: 0;
 }
 
 @media (min-width: 480px) {
@@ -115,7 +115,7 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   z-index: 1;
 }
 .greet {
-  font-size: 27px;
+  font-size: 21px;
   font-weight: 650;
   letter-spacing: 1.2px;
   color: var(--text);
@@ -446,11 +446,11 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 
 .about { text-align: center; color: var(--text-soft); font-size: 12px; line-height: 1.9; margin: 30px 0 6px; letter-spacing: 0.4px; }
 
-/* ---------- 底部导航（原生式全宽底栏，贴底显示） ---------- */
+/* ---------- 底部导航（原生式全宽底栏，贴底显示，按钮避让手势条） ---------- */
 .tabbar {
   position: absolute;
   left: 0; right: 0;
-  bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+  bottom: 0;
   z-index: 20;
   display: flex;
   background: rgba(20, 14, 12, 0.82);

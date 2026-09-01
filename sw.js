@@ -1,5 +1,5 @@
 /* 经期记 · Service Worker（离线兜底 + 网络优先，保证重新部署后手机端能及时更新） */
-const CACHE = "qinqi-v4";
+const CACHE = "qinqi-v5";
 const ASSETS = [
   "./",
   "./index.html",
