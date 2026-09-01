@@ -109,8 +109,7 @@
 
   /* ---------------- 渲染：看板 ---------------- */
   function renderDashboard() {
-    const BLESS = ["健健康康", "顺顺利利"];
-    document.getElementById("greet-text").textContent = BLESS[new Date().getDate() % BLESS.length];
+    document.getElementById("greet-text").textContent = "健健康康，顺顺利利";
     document.getElementById("today-label").textContent = predictSummary();
     renderCalendar();
   }
